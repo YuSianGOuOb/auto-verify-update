@@ -1,0 +1,6 @@
+PyYAML
+pydantic
+paramiko
+requests
+tenacity
+rich

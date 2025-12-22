@@ -1,0 +1,32 @@
+system:
+  profile: "PFR_Server_Rack_A"
+  type: "Standard"   # 指定這是一台 PFR or Standard 機種
+  connection:
+    ip: "10.10.11.73"
+    user: "admin"
+    pass: "cmb9.cmb9"
+    root_pass: "Qobmc.2401"
+
+# PFR 設定 (不更新，只稽核)
+pfr:
+  check_health: true
+
+# 需要更新的元件清單
+updates:
+  - name: "System_BIOS"
+    type: "BIOS"
+    version: "3A19.QCT101_T"
+    file: "./img/BIOS/3A19.QCT101_T.tar.gz"
+
+  # - name: "MB_CPLD"
+  #   type: "CPLD"
+  #   subtype: "MB"  # 對應原本 device_map.py 的 key
+  #   version: "01.04.00"
+  #   file: "./img/CPLD/MB/S7Q_MB_01.04.00.tar.gz"
+
+  # - name: "SCM_CPLD"
+  #   type: "CPLD"
+  #   subtype: "SCM"  # 對應原本 device_map.py 的 key
+  #   version: "01.00.00.01"
+  #   file: "./img/CPLD/SCM/S7Q_GNR_SCM_01.00.00.01.tar.gz"
+  

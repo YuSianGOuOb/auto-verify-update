@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -e
+
+IMAGE_NAME="bmc-update-env"
+
+# 如果參數是 --build，則重新建置映像檔
+if [[ "$1" == "--build" ]]; then
+    echo "[INFO] Building Docker image..."
+    docker build -t $IMAGE_NAME .
+    exit 0
+fi
+
+# 顯示使用說明
+if [[ "$1" == "-h" ]]; then
+    echo "Usage:"
+    echo "  ./run                    # Run with default config (config/inventory.yaml)"
+    echo "  ./run config/my_cfg.yaml # Run with specific config"
+    echo "  ./run --build            # Rebuild Docker image"
+    exit 0
+fi
+
+# 設定 Config 路徑 (如果有傳參數就用參數，否則用預設值)
+CONFIG_PATH="${1:-config/inventory.yaml}"
+
+echo "[INFO] Running with config: $CONFIG_PATH"
+
+# 執行 Docker
+# -v "$(pwd)":/app : 將當前目錄掛載進去，這樣改 code 不用重 build
+# --rm : 執行完自動刪除容器
+docker run --rm \
+    -v "$(pwd)":/app \
+    -w /app \
+    $IMAGE_NAME \
+    python3 main.py --config "$CONFIG_PATH"
