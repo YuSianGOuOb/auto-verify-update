@@ -43,7 +43,8 @@ class UpdateEngine:
         step(4, "Verify final version")
         try:
             self.component.verify_update()
-            info(f"[bold green]SUCCESS: {name} is now at version {target_ver}[/bold green]")
+            current_ver = self.component.get_current_version()
+            info(f"[bold green]SUCCESS: {name} is now at version {current_ver}[/bold green]")
         except VerificationError as e:
             error(f"Verification failed: {e}")
             raise

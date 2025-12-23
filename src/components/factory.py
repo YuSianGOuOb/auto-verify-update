@@ -1,6 +1,6 @@
 from src.components.cpld import CPLDComponent
 from src.components.bios import BIOSComponent
-# from src.components.bmc import BMCComponent    <-- 記得實作並 import
+from src.components.bmc import BMCComponent
 
 def create_component(config, drivers):
     if config.type == "CPLD":
@@ -9,8 +9,8 @@ def create_component(config, drivers):
         return BIOSComponent(drivers, config)
         # raise NotImplementedError("BIOS component not yet implemented")
     elif config.type == "BMC":
-        # return BMCComponent(drivers, config)
-        raise NotImplementedError("BMC component not yet implemented")
+        return BMCComponent(drivers, config)
+        # raise NotImplementedError("BMC component not yet implemented")
     else:
         raise ValueError(f"Unknown component type: {config.type}")
 

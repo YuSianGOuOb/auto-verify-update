@@ -3,6 +3,7 @@ from src.core.logger import info, error, warn
 from src.models.exceptions import UpdateFailedError, TimeoutError
 import time
 import re
+import json
 
 class CPLDComponent(FirmwareComponent):
     MAPPING = {
@@ -29,6 +30,25 @@ class CPLDComponent(FirmwareComponent):
         return self._extract_ver_from_busctl(output)
 
     def upload_firmware(self):
+        # [NEW] 1. 清理 BMC 暫存區 (防止空間不足或舊檔干擾)
+        try:
+            info("Cleaning up BMC staging area (/tmp/images)...")
+            # rm -rf 不會報錯即使目錄為空，非常安全
+            # 注意：OpenBMC 的上傳路徑通常是 /tmp/images，如果不確定，清 /tmp 裡的特定檔案也可
+            self.ssh.send_command("rm -rf /tmp/images/*")
+        except Exception as e:
+            # 清理失敗不應該阻擋流程，印個警告就好
+            warn(f"Failed to clean staging area: {e}")
+
+        # 2. 紀錄 Log 基準線
+        try:
+            cmd = "wc -l /var/log/redfish | awk '{print $1}'"
+            output = self.ssh.send_command(cmd)
+            self.log_baseline = int(output.strip())
+            info(f"Log Baseline recorded: {self.log_baseline} lines")
+        except Exception as e:
+            warn(f"Failed to record log baseline: {e}")
+            self.log_baseline = 0
         """
         在上傳前先記錄 Log 行數，確保 monitor 不會抓到舊資料
         """
@@ -49,11 +69,20 @@ class CPLDComponent(FirmwareComponent):
         target = f"/redfish/v1/UpdateService/FirmwareInventory/{self.meta['target_uri']}"
         endpoint = "/redfish/v1/UpdateService/upload"
         
-        self.redfish.post_file(
+                # 接住回傳值 (Response JSON)
+        result = self.redfish.post_file(
             endpoint=endpoint,
             file_path=self.config.file,
             payload={"Targets": [target]}
         )
+        
+        # 印出結果
+        info("Upload Response:")
+        print(json.dumps(result, indent=4)) # 漂亮列印 JSON
+        
+        # 如果回傳中有 Task ID，也可以特別印出來
+        if "Id" in result:
+             info(f"Task Created: ID = {result['Id']}")
 
     def monitor_update(self):
         """

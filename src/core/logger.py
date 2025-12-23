@@ -2,6 +2,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+import logging
+
+# [新增] 隱藏 paramiko 的連線錯誤雜訊
+logging.getLogger("paramiko").setLevel(logging.ERROR)
+
 # 強制啟動顏色，即使在 docker、非 TTY、redirect 中也會亮色
 console = Console(force_terminal=True)
 

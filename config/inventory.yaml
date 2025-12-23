@@ -13,10 +13,12 @@ pfr:
 
 # 需要更新的元件清單
 updates:
-  - name: "System_BIOS"
-    type: "BIOS"
-    version: "3A19.QCT101_T"
-    file: "./img/BIOS/3A19.QCT101_T.tar.gz"
+
+  # - name: "System_BIOS"
+  #   type: "BIOS"
+  #   version: "3A19.QCT101_T"
+  #   file: "./img/BIOS/3A19.QCT101_T.tar.gz"
+  
 
   # - name: "MB_CPLD"
   #   type: "CPLD"
@@ -29,4 +31,8 @@ updates:
   #   subtype: "SCM"  # 對應原本 device_map.py 的 key
   #   version: "01.00.00.01"
   #   file: "./img/CPLD/SCM/S7Q_GNR_SCM_01.00.00.01.tar.gz"
-  
+
+  - name: "Server_BMC"
+    type: "BMC"
+    version: "12.34"
+    file: "./img/BMC/S7Q_BMC_12.34.tar.gz"

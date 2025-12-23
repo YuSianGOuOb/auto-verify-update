@@ -12,7 +12,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # 安裝系統層級的依賴 (如果需要的話)
 # 例如：某些 CPLD 工具可能需要 ipmitool 或 build-essential
-# RUN apt-get update && apt-get install -y ipmitool && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    ipmitool \
+    sshpass \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # 1. 先複製 requirements.txt 並安裝依賴
 # (這樣做的好處是：如果只改程式碼沒改依賴，Docker 會用 Cache，加速 build 時間)
