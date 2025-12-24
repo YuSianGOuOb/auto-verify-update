@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from src.utils.log_parser import parse_sel_after_time
 from src.core.logger import warn, info
+from src.models.exceptions import TimeoutError
 import time
+import re
+import json
 
 class FirmwareComponent(ABC):
     def __init__(self, drivers, config):
@@ -9,6 +11,7 @@ class FirmwareComponent(ABC):
         self.redfish = drivers.redfish
         self.config = config
         self.name = config.name
+        self.log_baseline = 0
 
     @abstractmethod
     def get_current_version(self) -> str:
@@ -22,89 +25,142 @@ class FirmwareComponent(ABC):
     def monitor_update(self):
         pass
 
+    # === 通用工具方法 ===
+
+    def _extract_version(self, output):
+        m = re.search(r'"([^"]+)"', output)
+        return m.group(1) if m else "Unknown"
+
+    def _clean_staging_area(self):
+        try:
+            info("Cleaning up BMC staging area (/tmp/images)...")
+            self.ssh.send_command("rm -rf /tmp/images/*")
+        except Exception as e:
+            warn(f"Failed to clean staging area: {e}")
+
+    def _record_log_baseline(self):
+        try:
+            cmd = "wc -l /var/log/redfish | awk '{print $1}'"
+            output = self.ssh.send_command(cmd)
+            self.log_baseline = int(output.strip())
+            info(f"Log Baseline recorded: {self.log_baseline} lines")
+        except Exception as e:
+            warn(f"Failed to record log baseline: {e}")
+            self.log_baseline = 0
+
+    def _fetch_new_logs(self):
+        try:
+            count_cmd = "wc -l /var/log/redfish | awk '{print $1}'"
+            curr_lines = int(self.ssh.send_command(count_cmd).strip())
+
+            if self.log_baseline > 0 and curr_lines >= self.log_baseline:
+                cmd = f"tail -n +{self.log_baseline + 1} /var/log/redfish"
+            else:
+                cmd = "tail -n 50 /var/log/redfish"
+
+            return self.ssh.send_command(cmd)
+        except Exception:
+            return ""
+
+
+    def reboot_bmc(self):
+        """嘗試透過 Redfish (優先) 或 SSH 強制重啟 BMC"""
+        info("Sending BMC Reboot command...")
+        
+        # 1. 嘗試 Redfish GracefulRestart
+        try:
+            endpoint = "/redfish/v1/Managers/bmc/Actions/Manager.Reset"
+            payload = {"ResetType": "GracefulRestart"}
+            self.redfish.post_action(endpoint, payload)
+            info("Redfish restart command sent.")
+            return
+        except Exception as e:
+            warn(f"Redfish reset failed: {e}. Trying SSH...")
+
+        # 2. 失敗則嘗試 SSH reboot
+        try:
+            self.ssh.send_command("reboot")
+            info("SSH reboot command sent.")
+        except Exception:
+            pass
+
+    def wait_for_reboot(self, timeout=900):
+        """
+        等待 BMC 重啟完成：
+        1. 斷開現有連線
+        2. 迴圈嘗試 SSH 連線
+        3. 檢查 D-Bus/Systemd 狀態
+        """
+        info("Waiting for BMC to come back online...")
+        start_time = time.time()
+        
+        # 確保舊連線已關閉
+        try:
+            self.ssh.close()
+        except:
+            pass
+
+        # 稍作延遲，避免機器還沒關機我們就連進去了
+        time.sleep(15)
+
+        while time.time() - start_time < timeout:
+            try:
+                # 嘗試建立新連線
+                self.ssh.connect()
+                info("[bold green]SSH Connection Restored![/bold green]")
+                
+                # 連線成功後，檢查服務是否 Ready
+                self.wait_for_bmc_ready()
+                return
+            except Exception:
+                # 連線失敗代表還在開機中，繼續等
+                time.sleep(5)
+        
+        raise TimeoutError("BMC failed to come back online (SSH unreachable).")
+
     def wait_for_bmc_ready(self):
-        """
-        等待 BMC 完全就緒：
-        1. 檢查 D-Bus State 是否為 Ready
-        2. [新增] 檢查 systemctl list-jobs 是否為 "No jobs running."
-        """
+        """檢查 BMC 服務狀態 (D-Bus Ready & Systemd Jobs)"""
         info("Checking BMC Readiness...")
         timeout = 600 
         start_time = time.time()
         
-        # --- Stage 1: Check D-Bus State ---
-        info("Stage 1: Checking D-Bus State (xyz.openbmc_project.State.BMC)...")
+        # Stage 1: Check D-Bus State
         while time.time() - start_time < timeout:
             try:
-                # 確保 SSH 連線存在
-                if not self.ssh.client or not self.ssh.channel:
-                    try:
-                        self.ssh.connect()
-                    except:
-                        time.sleep(5)
-                        continue
-
                 cmd = (
-                    "busctl get-property "
-                    "xyz.openbmc_project.State.BMC "
+                    "busctl get-property xyz.openbmc_project.State.BMC "
                     "/xyz/openbmc_project/state/bmc0 "
                     "xyz.openbmc_project.State.BMC CurrentBMCState"
                 )
                 output = self.ssh.send_command(cmd)
                 
                 if "xyz.openbmc_project.State.BMC.BMCState.Ready" in output:
-                    info("[bold green]D-Bus State is 'Ready'![/bold green]")
                     break
-                
                 time.sleep(5)
             except Exception:
                 time.sleep(5)
         else:
-            warn("Timeout waiting for D-Bus State 'Ready'. Proceeding anyway...")
+            warn("Timeout waiting for D-Bus State 'Ready'. Proceeding...")
 
-        # --- Stage 2: Check Systemd Jobs ---
-        # 這是為了確保所有服務都已經啟動完畢 (Quiesced)
-        info("Stage 2: Checking Systemd Jobs (systemctl list-jobs)...")
+        # Stage 2: Check Systemd Jobs
         while time.time() - start_time < timeout:
             try:
-                cmd = "systemctl list-jobs"
-                output = self.ssh.send_command(cmd)
-                
-                # 檢查輸出是否包含 "No jobs running"
+                output = self.ssh.send_command("systemctl list-jobs")
                 if "No jobs running" in output:
-                    info("[bold green]Systemd is idle (No jobs running). System is fully operational.[/bold green]")
+                    info("[bold green]BMC is Fully Ready (No jobs running).[/bold green]")
                     return
-                else:
-                    # 如果還有 jobs 在跑，可以印出來看看是什麼 (選用)
-                    # info(f"Waiting for jobs to finish: {output.strip()}")
-                    time.sleep(5)
-
+                time.sleep(5)
             except Exception:
                 time.sleep(5)
 
-        warn("Timeout waiting for Systemd jobs to finish. Proceeding anyway...")
+        warn("Timeout waiting for Systemd jobs. Proceeding anyway...")
 
     def verify_update(self):
-        """預設驗證邏輯：比對版本"""
-        # [NEW] 在驗證前，先確保 BMC 是健康的
-        # 這樣就不怕 BIOS/CPLD 更新後 BMC 還在忙碌中
         self.wait_for_bmc_ready()
-
         current = self.get_current_version()
         target = self.config.version
         
-        # 使用 strip() 避免空白造成誤判
         if target.strip() not in current.strip():
-             warn(f"[Verification Mismatch] Expected '{target}', but got '{current}'. (Continuing execution...)")
-             # 如果您希望嚴格一點，這裡可以 raise Exception
-             # raise Exception(f"Version Mismatch! Expected: {target}, Got: {current}")
+             warn(f"[Verification Mismatch] Expected '{target}', but got '{current}'.")
         else:
              info(f"Version match verified: {current}")
-
-    def check_sel_log(self, baseline_time):
-        logs = parse_sel_after_time(self.ssh, baseline_time)
-        if logs:
-            for line in logs:
-                print(f"[SEL] {line}")
-            return False
-        return True
