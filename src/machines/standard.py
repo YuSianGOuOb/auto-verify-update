@@ -8,6 +8,8 @@ class StandardMachineVerifier(MachineVerifier):
         
         all_passed = True
         results = {}
+        driver_ref = self.components[0] if self.components else None
+        driver_ref.wait_for_bmc_ready()
 
         for component in self.components:
             info(f"\n>>> Processing Component: {component.name} <<<")
