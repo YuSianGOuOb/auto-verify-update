@@ -82,7 +82,7 @@ def main():
                     comp = ComponentFactory.create(update_cfg, drivers)
                     
                     # 取得版本 (並去除空白)
-                    current = comp.get_current_version().strip()
+                    current = comp.get_current_version(quiet=True).strip()
                     expected = update_cfg.version.strip()
                     
                     if current == expected:

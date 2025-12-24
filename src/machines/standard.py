@@ -1,6 +1,6 @@
 from src.machines.base import MachineVerifier
 from src.core.engine import UpdateEngine
-from src.core.logger import info, error
+from src.core.logger import info, error, section # [新增] 引入 section
 
 class StandardMachineVerifier(MachineVerifier):
     def verify_system(self):
@@ -8,11 +8,11 @@ class StandardMachineVerifier(MachineVerifier):
         
         all_passed = True
         results = {}
-        driver_ref = self.components[0] if self.components else None
-        driver_ref.wait_for_bmc_ready()
 
         for component in self.components:
-            info(f"\n>>> Processing Component: {component.name} <<<")
+            # [修改] 使用 section 顯示大標題
+            section(f"Processing Component: {component.name}")
+            
             engine = UpdateEngine(component)
             
             try:

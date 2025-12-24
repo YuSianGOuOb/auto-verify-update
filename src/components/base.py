@@ -14,7 +14,7 @@ class FirmwareComponent(ABC):
         self.log_baseline = 0
 
     @abstractmethod
-    def get_current_version(self) -> str:
+    def get_current_version(self, quiet=False) -> str:
         pass
 
     @abstractmethod
@@ -118,11 +118,17 @@ class FirmwareComponent(ABC):
         
         raise TimeoutError("BMC failed to come back online (SSH unreachable).")
 
-    def wait_for_bmc_ready(self):
-        """檢查 BMC 服務狀態 (D-Bus Ready & Systemd Jobs)"""
-        info("Checking BMC Readiness...")
+    def wait_for_bmc_ready(self, quiet=False):
+        """
+        檢查 BMC 服務狀態。
+        :param quiet: 若為 True，且 BMC 一次就檢查通過，則不印出任何 Log。
+        """
+        if not quiet:
+            info("Checking BMC Readiness...")
+        
         timeout = 600 
         start_time = time.time()
+        logged_wait = False # 標記是否已經印過等待訊息
         
         # Stage 1: Check D-Bus State
         while time.time() - start_time < timeout:
@@ -136,6 +142,12 @@ class FirmwareComponent(ABC):
                 
                 if "xyz.openbmc_project.State.BMC.BMCState.Ready" in output:
                     break
+                
+                # 如果檢查失敗（還沒 Ready），且 quiet=True，這時候才開始印 Log
+                if quiet and not logged_wait:
+                    info("BMC not ready yet, waiting...")
+                    logged_wait = True
+                
                 time.sleep(5)
             except Exception:
                 time.sleep(5)
@@ -147,8 +159,17 @@ class FirmwareComponent(ABC):
             try:
                 output = self.ssh.send_command("systemctl list-jobs")
                 if "No jobs running" in output:
-                    info("[bold green]BMC is Fully Ready (No jobs running).[/bold green]")
+                    if not quiet:
+                        info("[bold green]BMC is Fully Ready (No jobs running).[/bold green]")
+                    elif logged_wait:
+                        # 如果前面有印過等待訊息，這裡補一個完成訊息
+                        info("[bold green]BMC is now Ready.[/bold green]")
                     return
+                
+                if quiet and not logged_wait:
+                    info("Waiting for systemd jobs to finish...")
+                    logged_wait = True
+                    
                 time.sleep(5)
             except Exception:
                 time.sleep(5)
@@ -157,7 +178,7 @@ class FirmwareComponent(ABC):
 
     def verify_update(self):
         self.wait_for_bmc_ready()
-        current = self.get_current_version()
+        current = self.get_current_version(quiet=True)
         target = self.config.version
         
         if target.strip() not in current.strip():

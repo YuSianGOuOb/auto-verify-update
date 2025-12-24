@@ -9,11 +9,30 @@ class BMCComponent(FirmwareComponent):
     PRIMARY_PATH = "/xyz/openbmc_project/software/BMCPrimary"
     SECONDARY_PATH = "/xyz/openbmc_project/software/BMCSecondary"
 
-    def get_current_version(self):
+    def get_current_version(self, quiet=False):
+        self.wait_for_bmc_ready(quiet=True)
+        # 1. 判斷 Boot Source
+        try:
+            boot_source = self.ssh.send_command("/usr/bin/processBootInfo -i").strip()
+        except Exception:
+            boot_source = "Primary"
+
+        # 2. 取得雙邊版本
         pri_ver = self._get_ver_from_dbus(self.PRIMARY_PATH)
         sec_ver = self._get_ver_from_dbus(self.SECONDARY_PATH)
-        info(f"BMC Versions - Primary: [cyan]{pri_ver}[/cyan], Secondary: [dim]{sec_ver}[/dim]")
-        return pri_ver
+
+        # [新增] quiet 控制
+        if not quiet:
+            info(f"BMC Versions - Primary: [cyan]{pri_ver}[/cyan], Secondary: [dim]{sec_ver}[/dim]")
+            info(f"Active Boot Source: [bold yellow]{boot_source}[/bold yellow]")
+
+        # 3. 根據 Boot Source 決定回傳哪個版本
+        if "Alternate" in boot_source:
+            if not quiet: info("Verifying against [magenta]Secondary[/magenta] version.")
+            return sec_ver
+        else:
+            if not quiet: info("Verifying against [magenta]Primary[/magenta] version.")
+            return pri_ver
 
     def _get_ver_from_dbus(self, object_path):
         try:

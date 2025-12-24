@@ -7,13 +7,17 @@ import json
 class BIOSComponent(FirmwareComponent):
     DBUS_PATH = "/xyz/openbmc_project/software/BIOS"
 
-    def get_current_version(self):
+    def get_current_version(self, quiet=False):
+        self.wait_for_bmc_ready(quiet=True)
         cmd = (
             "busctl get-property xyz.openbmc_project.Software.BMC.Updater "
             f"{self.DBUS_PATH} xyz.openbmc_project.Software.Version Version"
         )
         output = self.ssh.send_command(cmd)
-        return self._extract_version(output)
+        ver = self._extract_version(output)
+        if not quiet:
+            info(f"BIOS Version: {ver}")
+        return ver
 
     def upload_firmware(self):
         self._clean_staging_area()

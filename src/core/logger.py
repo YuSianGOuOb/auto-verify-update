@@ -4,6 +4,7 @@ from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.text import Text
 from rich.theme import Theme
+from rich.align import Align # [新增] 用於文字置中
 
 # 1. 定義主題顏色
 custom_theme = Theme({
@@ -12,15 +13,13 @@ custom_theme = Theme({
     "error": "bold red"
 })
 
-# 2. 建立全域 console 實例 (強制啟用顏色，避免在 Docker 中變黑白)
+# 2. 建立全域 console 實例 (強制啟用顏色)
 console = Console(force_terminal=True, theme=custom_theme)
 
 def setup_logger(level="INFO"):
     """
     初始化 Logger 設定
     """
-    # 設定 root logger 使用 RichHandler
-    # RichHandler 會自動處理時間與顏色
     logging.basicConfig(
         level=level,
         format="%(message)s",
@@ -28,16 +27,12 @@ def setup_logger(level="INFO"):
         handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)]
     )
 
-    # [關鍵修正] 將 Paramiko 靜音等級調至 CRITICAL
-    # 因為 paramiko 會將 Connection Reset 視為 ERROR，設定為 CRITICAL 才能完全隱藏
+    # 將 Paramiko 與 urllib3 靜音
     logging.getLogger("paramiko").setLevel(logging.CRITICAL)
-    
-    # 也可以順便把其他吵雜的 library 靜音
     logging.getLogger("urllib3").setLevel(logging.ERROR)
 
-# 3. 包裝 Logging 方法 (讓原本的程式碼可以無痛轉移)
+# 3. 包裝 Logging 方法
 def info(msg):
-    # 使用 logging.info，RichHandler 會自動加上漂亮的 [INFO] 標籤
     logging.info(msg, extra={"markup": True})
 
 def warn(msg):
@@ -46,18 +41,13 @@ def warn(msg):
 def error(msg):
     logging.error(msg, extra={"markup": True})
 
-# 4. 保留您原本好用的特殊格式輸出
+# 4. 特殊格式輸出
 def step(n, msg):
     console.print(f"\n[bold cyan]=== STEP {n}: {msg} ===[/bold cyan]\n")
 
 def info_block(text, title="Raw Output", title_color="cyan"):
-    """
-    顯示多行文字區塊
-    """
-    # 讓 title 前面有一行標準的 Log 時間戳記
+    """顯示多行文字區塊"""
     info(f"{title}:")
-
-    # 內容使用 Panel 包覆
     body = Text(text, style="white", no_wrap=True)
     panel = Panel(
         body,
@@ -66,3 +56,18 @@ def info_block(text, title="Raw Output", title_color="cyan"):
         expand=False,
     )
     console.print(panel)
+
+def section(msg):
+    """
+    [新增] 顯示顯眼的段落標題，用於切換元件時
+    """
+    console.print() # 先空一行
+    panel = Panel(
+        Align.center(f"[bold white]{msg}[/bold white]", vertical="middle"),
+        border_style="bright_magenta",
+        padding=(1, 2), # 上下留白 1 行，左右 2 字元
+        title="[bold yellow]NEXT TARGET[/bold yellow]",
+        subtitle="[dim]Auto-Verify-Update[/dim]"
+    )
+    console.print(panel)
+    console.print()

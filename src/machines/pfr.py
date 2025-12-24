@@ -1,6 +1,6 @@
-# src/machines/pfr.py
 from src.machines.base import MachineVerifier
-from src.core.engine import UpdateEngine # [FIX] 記得 import
+from src.core.engine import UpdateEngine
+from src.core.logger import section # [新增] 引入 section
 
 class PFRMachineVerifier(MachineVerifier):
     def __init__(self, components, pfr_auditor):
@@ -14,8 +14,9 @@ class PFRMachineVerifier(MachineVerifier):
         failed_components = []
         for comp in self.components:
             try:
-                # [FIX] 使用 Engine 來執行流程
-                print(f">>> Updating {comp.name}...")
+                # [修改] 使用 section 顯示大標題
+                section(f"Updating Component: {comp.name}")
+                
                 engine = UpdateEngine(comp)
                 engine.execute()
                 
@@ -26,6 +27,9 @@ class PFRMachineVerifier(MachineVerifier):
                 failed_components.append(comp.name)
 
         # 2. PFR 稽核
+        # 這裡也可以加一個 Section 區隔
+        section("Starting PFR Security Audit")
+        
         is_healthy, reason = self.pfr_auditor.check_health()
         
         if not is_healthy:
@@ -34,4 +38,4 @@ class PFRMachineVerifier(MachineVerifier):
         if failed_components:
             raise Exception(f"Components failed to update: {failed_components}")
 
-        print("✅ PFR System Verification Passed.")
+        print(" PFR System Verification Passed.")

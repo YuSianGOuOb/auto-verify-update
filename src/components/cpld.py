@@ -18,14 +18,17 @@ class CPLDComponent(FirmwareComponent):
             raise ValueError(f"Unknown CPLD subtype: {config.subtype}")
         self.meta = self.MAPPING[config.subtype]
 
-    def get_current_version(self):
+    def get_current_version(self, quiet=False):
+        self.wait_for_bmc_ready(quiet=True)
         cmd = (
             "busctl get-property xyz.openbmc_project.Software.BMC.Updater "
             f"{self.meta['path']} xyz.openbmc_project.Software.Version Version"
         )
         output = self.ssh.send_command(cmd)
-        # [重構] 直接呼叫父類方法
-        return self._extract_version(output)
+        ver = self._extract_version(output)
+        if not quiet:
+            info(f"CPLD {self.config.subtype} Version: {ver}")
+        return ver
 
     def upload_firmware(self):
         # [重構] 呼叫父類別的共用步驟
