@@ -20,8 +20,10 @@ class BIOSComponent(FirmwareComponent):
         return ver
 
     def upload_firmware(self):
+        self.host_power_off()
         self._clean_staging_area()
         self._record_log_baseline()
+
 
         info("Uploading BIOS firmware with OEM parameters...")
         endpoint = "/redfish/v1/UpdateService/upload"
@@ -53,6 +55,9 @@ class BIOSComponent(FirmwareComponent):
                 
             if "UpdateSuccessful" in logs or "AwaitToActivate" in logs:
                 info("[bold green]BIOS Upload verification successful (Staged/Await).[/bold green]")
+                self.check_system_logs()
+                self.host_power_on()
+                self.wait_for_host_boot()
                 return
 
             if "ApplyFailed" in logs:

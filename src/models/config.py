@@ -21,6 +21,9 @@ class UpdateConfig(BaseModel):
     version: str
     file: Optional[str] = None     # PFR 模式下可能不需要檔案
     
+    apply_time: str = "Immediate"
+    preserve: bool = True
+    
     # PFR 模式專用：預期下游元件的版本
     expectations: Optional[Dict[str, str]] = {} 
 

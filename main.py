@@ -5,6 +5,7 @@ import traceback
 import logging
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text  # [新增] 用於處理帶顏色的版本字串
 
 # 模型與驅動
 from src.models.config import Inventory
@@ -14,8 +15,12 @@ from src.components.factory import ComponentFactory
 from src.components.pfr import PFRComponent
 from src.machines.pfr import PFRMachineVerifier
 from src.machines.standard import StandardMachineVerifier
-# [FIX] 引入新的 setup_logger
-from src.core.logger import error, info, setup_logger
+
+# 引入新的 Logger 和 Section 工具
+from src.core.logger import error, info, setup_logger, section
+
+# [新增] 引入自定義 Exception
+from src.models.exceptions import VerificationSkipped
 
 def load_config(path):
     try:
@@ -36,7 +41,6 @@ def main():
         default="config/inventory.yaml", 
         help="Path to the inventory config file"
     )
-    # [新增] -v 參數 (只驗證不更新)
     parser.add_argument(
         "-v", "--verify", 
         action="store_true", 
@@ -44,7 +48,7 @@ def main():
     )
     args = parser.parse_args()
 
-    # 1. 初始化 Logger (這會把 Paramiko 設為 CRITICAL 靜音)
+    # 1. 初始化 Logger
     setup_logger()
 
     config = load_config(args.config)
@@ -61,10 +65,9 @@ def main():
         ssh.connect()
 
         # ==========================================
-        # [分支 A] 如果是 -v 模式，只檢查版本並畫表格
+        # [分支 A] -v 模式 (只驗證不更新)
         # ==========================================
         if args.verify:
-            # 這裡建立一個新的 console 來畫表，不受 logging 格式影響
             console = Console()
             info("Running in [bold cyan]VERIFICATION ONLY[/bold cyan] mode...")
             
@@ -78,28 +81,33 @@ def main():
 
             for update_cfg in config.updates:
                 try:
-                    # 利用工廠建立元件
                     comp = ComponentFactory.create(update_cfg, drivers)
                     
-                    # 取得版本 (並去除空白)
-                    current = comp.get_current_version(quiet=True).strip()
+                    # [修正] 取得版本字串 (可能包含顏色與 Primary 標註)
+                    # 例如: "3.24.00 ([yellow]Primary[/yellow])"
+                    raw_current = comp.get_current_version(quiet=True).strip()
                     expected = update_cfg.version.strip()
                     
-                    if current == expected:
+                    # [關鍵邏輯] 去除顏色並切割，只比對純版號
+                    # 1. 去除 Rich 標籤 -> "3.24.00 (Primary)"
+                    plain_text = Text.from_markup(raw_current).plain
+                    # 2. 取空白鍵前的部分 -> "3.24.00"
+                    real_ver = plain_text.split(" ")[0].strip()
+
+                    if real_ver == expected:
                         status = "[green]✅ PASS[/green]"
                     else:
                         status = "[bold red]❌ MISMATCH[/bold red]"
                         all_match = False
                     
-                    table.add_row(update_cfg.name, current, expected, status)
+                    # 表格顯示原始豐富資訊，但比對結果是正確的
+                    table.add_row(update_cfg.name, raw_current, expected, status)
                 
                 except Exception as e:
                     table.add_row(update_cfg.name, "[red]Error[/red]", update_cfg.version, f"[red]{str(e)}[/red]")
                     all_match = False
             
             console.print(table)
-            
-            # 根據結果決定 Exit Code (方便 CI/CD 整合)
             sys.exit(0 if all_match else 1)
 
         # ==========================================
@@ -107,13 +115,11 @@ def main():
         # ==========================================
         info("Starting full update process...")
 
-        # 建立所有組件
         components = []
         for update_cfg in config.updates:
             comp = ComponentFactory.create(update_cfg, drivers)
             components.append(comp)
 
-        # 根據機種選擇驗證策略
         if config.system.type == "PFR":
             info("Detected PFR System. Initializing PFR logic...")
             pfr_auditor = PFRComponent(drivers)
@@ -122,14 +128,20 @@ def main():
             info("Detected Standard System.")
             machine = StandardMachineVerifier(components)
 
-        # 執行流程
         machine.verify_system()
+
+    # [新增] 捕捉 VerificationSkipped 以優雅中止 (防止被下方的 Exception 抓到)
+    except VerificationSkipped as e:
+        section("MANUAL ACTION REQUIRED")
+        info(f"[yellow]{e}[/yellow]")
+        info("[yellow]Automated verification stopped. Please verify system status manually.[/yellow]")
+        sys.exit(0)
 
     except Exception as e:
         error(f"Execution Failed: {e}")
-        # 如果需要詳細除錯再打開 traceback
         # traceback.print_exc()
         sys.exit(1)
+        
     finally:
         if 'ssh' in locals():
             try:

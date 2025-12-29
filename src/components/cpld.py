@@ -31,9 +31,9 @@ class CPLDComponent(FirmwareComponent):
         return ver
 
     def upload_firmware(self):
-        # [重構] 呼叫父類別的共用步驟
         self._clean_staging_area()
         self._record_log_baseline()
+        self.host_power_off()
 
         # CPLD 特有的上傳參數
         info(f"Uploading CPLD {self.config.subtype}...")
@@ -63,6 +63,7 @@ class CPLDComponent(FirmwareComponent):
             # 檢查 CPLD 特有的成功/失敗關鍵字
             if "UpdateSuccessful" in logs:
                 info(f"[bold green]CPLD {self.config.subtype} Upload successful.[/bold green]")
+                self.check_system_logs()
                 return
 
             if "ApplyFailed" in logs:

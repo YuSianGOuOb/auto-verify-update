@@ -1,6 +1,6 @@
 system:
   profile: "PFR_Server_Rack_A"
-  type: "PFR"   # 指定這是一台 PFR or Standard 機種
+  type: "Standard"   # 指定這是一台 PFR or Standard 機種
   connection:
     ip: "10.10.11.73"
     user: "admin"
@@ -40,6 +40,11 @@ updates:
 
   # - name: "System_BIOS"
   #   type: "BIOS"
+  #   version: "3A18.QCT402_T"
+  #   file: "./img/BIOS/3A18.QCT402_T.tar.gz"
+  
+  # - name: "System_BIOS"
+  #   type: "BIOS"
   #   version: "3A19.QCT101_T"
   #   file: "./img/BIOS/3A19.QCT101_T.tar.gz"
 
@@ -47,23 +52,29 @@ updates:
   #   type: "BMC"
   #   version: "3.24.00"
   #   file: "./img/BMC/quanta-s7q-20251128073847.tar"
-
-  # - name: "Server_BMC"
-  #   type: "BMC"
-  #   version: "3.25.00"
-  #   file: "./img/BMC/quanta-s7q-20251218084518.tar"
-
-  # - name: "Server_BMC"
-  #   type: "BMC"
-  #   version: "3.25.00"
-  #   file: "./img/BMC/quanta-s7q-20251218084518.tar"
+  #   apply_time: "Immediate"  # Immediate or OnReset
+  #   preserve: true          # preserve settings or not (like Factory Reset update)
 
   - name: "Server_BMC"
     type: "BMC"
     version: "3.25.00"
-    file: "./img/BMC/pfr_3.25/bmc_cap_signed.bin"
+    file: "./img/BMC/quanta-s7q-20251218084518.tar"
+    apply_time: "OnReset"  # Immediate or OnReset
+    preserve: true          # preserve settings or not (like Factory Reset update)
 
-  - name: "Server_BMC"
-    type: "BMC"
-    version: "3.23.00"
-    file: "./img/BMC/pfr_3.23/bmc_cap_signed.bin"
+  # - name: "Server_BMC"
+  #   type: "BMC"
+  #   version: "3.25.00"
+  #   file: "./img/BMC/quanta-s7q-20251218084518.tar"
+  #   apply_time: "Immediate"  # Immediate or OnReset
+  #   preserve: false          # preserve settings or not (like Factory Reset update)
+
+  # - name: "Server_BMC"
+  #   type: "BMC"
+  #   version: "3.25.00"
+  #   file: "./img/BMC/pfr_3.25/bmc_cap_signed.bin"
+
+  # - name: "Server_BMC"
+  #   type: "BMC"
+  #   version: "3.23.00"
+  #   file: "./img/BMC/pfr_3.23/bmc_cap_signed.bin"

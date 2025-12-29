@@ -1,6 +1,7 @@
-from src.core.logger import info, error, step
+from src.core.logger import info, error, step, section, warn
 from src.components.base import FirmwareComponent
-from src.models.exceptions import VerificationError, UpdateFailedError
+from src.models.exceptions import VerificationError, UpdateFailedError, VerificationSkipped
+import sys
 
 class UpdateEngine:
     def __init__(self, component: FirmwareComponent):
@@ -15,8 +16,8 @@ class UpdateEngine:
         # Step 1: Pre-check
         step(1, f"Pre-check current version for {name}")
         try:
-            current_ver = self.component.get_current_version()
-            info(f"Current Version: {current_ver}")
+            self.component.get_current_version()
+            info(f"Target Version: {target_ver}")
         except Exception as e:
             error(f"Failed to get version: {e}")
             raise
@@ -45,6 +46,14 @@ class UpdateEngine:
             self.component.verify_update()
             current_ver = self.component.get_current_version()
             info(f"[bold green]SUCCESS: {name} is now at version {current_ver}[/bold green]")
+        # === [關鍵修正] 捕捉跳過驗證的例外 ===
+        except VerificationSkipped as e:
+            section("MANUAL ACTION REQUIRED")
+            warn(f"[yellow]{e}[/yellow]")
+            warn("[yellow]Automated verification stopped. Please verify system status manually.[/yellow]")
+            info("Terminating program to prevent connection errors.")
+            sys.exit(0) #中止程式
+
         except VerificationError as e:
             error(f"Verification failed: {e}")
             raise

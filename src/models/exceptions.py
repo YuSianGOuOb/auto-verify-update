@@ -21,3 +21,10 @@ class VerificationError(AutoVerifyError):
 class PFRViolationError(AutoVerifyError):
     """PFR 稽核失敗 (偵測到還原事件)"""
     pass
+
+class VerificationSkipped(AutoVerifyError):
+    """
+    [新增] 用於標示驗證步驟被主動跳過 (例如 Non-Preserve 更新導致連線中斷)。
+    這不算失敗，但代表自動化流程到此為止。
+    """
+    pass
