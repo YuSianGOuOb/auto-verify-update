@@ -30,7 +30,8 @@ cd auto-verify-update
 chmod +x run
 ```
 
-### 3. 準備韌體檔案 請將您的韌體檔案 (.tar, .bin, .hpm) 放入專案目錄下的 img/ 資料夾中（或依照設定檔路徑配置）。
+### 3. 準備韌體檔案 :
+請將您的韌體檔案 (.tar, .bin, .hpm) 放入專案目錄下的 img/ 資料夾中（或依照設定檔路徑配置）。
 
 ## ⚙️ 設定說明 (config/inventory.yaml)
 
