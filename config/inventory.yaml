@@ -14,11 +14,11 @@ pfr:
 # 需要更新的元件清單
 updates:
 
-  # - name: "MB_CPLD"
-  #   type: "CPLD"
-  #   subtype: "MB"  # 對應原本 device_map.py 的 key
-  #   version: "01.04.00"
-  #   file: "./img/CPLD/MB/S7Q_MB_01.04.00.tar.gz"
+  - name: "MB_CPLD"
+    type: "CPLD"
+    subtype: "MB"  # 對應原本 device_map.py 的 key
+    version: "01.04.00"
+    file: "./img/CPLD/MB/S7Q_MB_01.04.00.tar.gz"
 
   # - name: "MB_CPLD"
   #   type: "CPLD"
@@ -43,24 +43,24 @@ updates:
   #   version: "3A18.QCT402_T"
   #   file: "./img/BIOS/3A18.QCT402_T.tar.gz"
   
-  # - name: "System_BIOS"
-  #   type: "BIOS"
-  #   version: "3A19.QCT101_T"
-  #   file: "./img/BIOS/3A19.QCT101_T.tar.gz"
-
-  - name: "Server_BMC"
-    type: "BMC"
-    version: "3.24.00"
-    file: "./img/BMC/quanta-s7q-20251128073847.tar"
-    apply_time: "Immediate"  # Immediate or OnReset
-    preserve: true          # preserve settings or not (like Factory Reset update)
+  - name: "System_BIOS"
+    type: "BIOS"
+    version: "3A19.QCT101_T"
+    file: "./img/BIOS/3A19.QCT101_T.tar.gz"
 
   # - name: "Server_BMC"
   #   type: "BMC"
-  #   version: "3.25.00"
-  #   file: "./img/BMC/quanta-s7q-20251218084518.tar"
+  #   version: "3.24.00"
+  #   file: "./img/BMC/quanta-s7q-20251128073847.tar"
   #   apply_time: "Immediate"  # Immediate or OnReset
   #   preserve: true          # preserve settings or not (like Factory Reset update)
+
+  - name: "Server_BMC"
+    type: "BMC"
+    version: "3.25.00"
+    file: "./img/BMC/quanta-s7q-20251218084518.tar"
+    apply_time: "Immediate"  # Immediate or OnReset
+    preserve: true          # preserve settings or not (like Factory Reset update)
 
   # - name: "Server_BMC"
   #   type: "BMC"

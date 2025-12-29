@@ -55,6 +55,7 @@ class BIOSComponent(FirmwareComponent):
                 
             if "UpdateSuccessful" in logs or "AwaitToActivate" in logs:
                 info("[bold green]BIOS Upload verification successful (Staged/Await).[/bold green]")
+                info_block(logs, title="Success Log Found")
                 self.check_system_logs()
                 self.host_power_on()
                 self.wait_for_host_boot()

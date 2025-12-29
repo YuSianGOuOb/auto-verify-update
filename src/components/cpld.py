@@ -63,6 +63,7 @@ class CPLDComponent(FirmwareComponent):
             # 檢查 CPLD 特有的成功/失敗關鍵字
             if "UpdateSuccessful" in logs:
                 info(f"[bold green]CPLD {self.config.subtype} Upload successful.[/bold green]")
+                info_block(logs, title="Success Log Found")
                 self.check_system_logs()
                 return
 
