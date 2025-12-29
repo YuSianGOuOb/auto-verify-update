@@ -1,4 +1,4 @@
-from src.core.logger import info, warn, error
+from src.core.logger import info, info_block, warn, error
 
 class LogMixin:
     """負責 Log 基準線紀錄與檢查"""
@@ -34,15 +34,6 @@ class LogMixin:
 
     def check_system_logs(self):
         info("Checking System Logs...")
-        has_error = False
-        
-        # 1. Redfish
-        rf_logs = self._fetch_new_logs()
-        if "Error" in rf_logs or "Failed" in rf_logs:
-            warn("Suspicious keywords in new Redfish logs.")
-            has_error = True
-
-        # 2. IPMI SEL
         try:
             curr_sel = int(self.ssh.send_command("ipmitool sel list | wc -l").strip())
             if self.sel_baseline >= 0 and curr_sel > self.sel_baseline:
@@ -53,7 +44,7 @@ class LogMixin:
                 vers = [l for l in new_sel.splitlines() if "Version" in l]
                 if vers:
                     info("--- New Version Logs (SEL) ---")
-                    print("\n".join(vers))
+                    info_block("\n".join(vers), title="New Version Logs (SEL)")
                     info("[bold green]Version log found.[/bold green]")
                 else:
                     warn("No 'Version' events in NEW SEL.")
@@ -61,8 +52,7 @@ class LogMixin:
                 # Check Critical
                 if "Critical" in new_sel or "Non-Recoverable" in new_sel:
                     error("Critical events in NEW SEL!")
-                    print(new_sel)
-                    has_error = True
+                    info_block(new_sel, title="Critical Events", title_color="red")
             else:
                 info("No new SEL entries.")
         except Exception as e:

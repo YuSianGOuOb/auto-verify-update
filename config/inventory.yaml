@@ -1,5 +1,5 @@
 system:
-  profile: "PFR_Server_Rack_A"
+  profile: "Server_Rack_A"
   type: "Standard"   # 指定這是一台 PFR or Standard 機種
   connection:
     ip: "10.10.11.73"
@@ -48,19 +48,19 @@ updates:
   #   version: "3A19.QCT101_T"
   #   file: "./img/BIOS/3A19.QCT101_T.tar.gz"
 
-  # - name: "Server_BMC"
-  #   type: "BMC"
-  #   version: "3.24.00"
-  #   file: "./img/BMC/quanta-s7q-20251128073847.tar"
-  #   apply_time: "Immediate"  # Immediate or OnReset
-  #   preserve: true          # preserve settings or not (like Factory Reset update)
-
   - name: "Server_BMC"
     type: "BMC"
-    version: "3.25.00"
-    file: "./img/BMC/quanta-s7q-20251218084518.tar"
-    apply_time: "OnReset"  # Immediate or OnReset
+    version: "3.24.00"
+    file: "./img/BMC/quanta-s7q-20251128073847.tar"
+    apply_time: "Immediate"  # Immediate or OnReset
     preserve: true          # preserve settings or not (like Factory Reset update)
+
+  # - name: "Server_BMC"
+  #   type: "BMC"
+  #   version: "3.25.00"
+  #   file: "./img/BMC/quanta-s7q-20251218084518.tar"
+  #   apply_time: "Immediate"  # Immediate or OnReset
+  #   preserve: true          # preserve settings or not (like Factory Reset update)
 
   # - name: "Server_BMC"
   #   type: "BMC"

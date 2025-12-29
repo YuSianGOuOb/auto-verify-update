@@ -1,52 +1,58 @@
 #!/bin/bash
 
-set -e
+IMAGE_NAME="auto-verify-update"
+CONFIG_DIR="$(pwd)/config"
+IMG_DIR="$(pwd)/img"
 
-IMAGE_NAME="bmc-update-env"
+# 顯示幫助訊息
+function show_help {
+    echo "Usage: ./run [options]"
+    echo ""
+    echo "Options:"
+    echo "  --build                      Force rebuild the Docker image"
+    echo "  -v, --verify                 Run in Verification Only mode (skip updates)"
+    echo "  -c, --config <file>          Path to specific config file (default: config/inventory.yaml)"
+    echo "  -h, --help                   Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./run --build                            # First time setup (Builds Docker environment)"
+    echo "  ./run                                    # Standard update (uses default config)"
+    echo "  ./run -v                                 # Verify only (uses default config)"
+    echo "  ./run -c config/server_b.yaml            # Update with specific config"
+    echo "  ./run -v -c config/server_b.yaml         # Verify with specific config"
+    echo "  ./run -c config/cpld_only.yaml           # Single component test"
+    echo ""
+}
 
-# 1. 建置映像檔
-if [[ "$1" == "--build" ]]; then
-    echo "[INFO] Building Docker image..."
-    docker build -t $IMAGE_NAME .
-    exit 0
-fi
+# 檢查參數
+ARGS=()
+BUILD_FLAG=false
 
-# 2. 顯示使用說明
-if [[ "$1" == "-h" ]]; then
-    echo "Usage:"
-    echo "  ./run                       # Update with default config"
-    echo "  ./run -v                    # Verify versions ONLY (Default config)"
-    echo "  ./run config/my.yaml        # Update with specific config"
-    echo "  ./run -v config/my.yaml     # Verify versions with specific config"
-    echo "  ./run --build               # Rebuild Docker image"
-    exit 0
-fi
-
-# 3. 參數解析
-CONFIG_PATH="config/inventory.yaml"
-PYTHON_FLAGS=""
-
-# 迴圈檢查所有參數 ($@)
 for arg in "$@"; do
-    if [[ "$arg" == -* ]]; then
-        # 如果是 flag (如 -v)，加入 PYTHON_FLAGS
-        PYTHON_FLAGS="$PYTHON_FLAGS $arg"
-    else
-        # 如果不是 flag，認定為 Config 路徑
-        CONFIG_PATH="$arg"
-    fi
+    case $arg in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --build)
+            BUILD_FLAG=true
+            ;;
+        *)
+            ARGS+=("$arg")
+            ;;
+    esac
 done
 
-echo "[INFO] Configuration: $CONFIG_PATH"
-if [[ ! -z "$PYTHON_FLAGS" ]]; then
-    echo "[INFO] Flags: $PYTHON_FLAGS"
+# 建置 Docker Image (若不存在或指定 --build)
+if [[ "$(docker images -q $IMAGE_NAME 2> /dev/null)" == "" ]] || [ "$BUILD_FLAG" = true ]; then
+    echo "Building Docker image..."
+    docker build -t $IMAGE_NAME .
 fi
 
-# 4. 執行 Docker
-# 將 flags 與 config 傳給 main.py
-# -v "$(pwd)":/app : 掛載當前目錄
+# 執行 Container
+# 直接將參數透傳給 python main.py
 docker run --rm -it \
-    -v "$(pwd)":/app \
-    -w /app \
-    $IMAGE_NAME \
-    python3 main.py $PYTHON_FLAGS --config "$CONFIG_PATH"
+  -v "$CONFIG_DIR":/app/config \
+  -v "$IMG_DIR":/app/img \
+  $IMAGE_NAME \
+  python main.py "${ARGS[@]}"

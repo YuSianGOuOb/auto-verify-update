@@ -1,5 +1,5 @@
 from src.components.base import FirmwareComponent
-from src.core.logger import info, error, warn, section
+from src.core.logger import info, error, info_block, warn, section
 from src.models.exceptions import TimeoutError, UpdateFailedError, VerificationSkipped
 import time
 import paramiko
@@ -83,7 +83,7 @@ class BMCComponent(FirmwareComponent):
         
         info("Upload Response:")
         import json
-        print(json.dumps(result, indent=4))
+        info_block(json.dumps(result, indent=4), title="Upload Response")
         
         if "Id" in result:
              info(f"Task Created: ID = {result['Id']}")
@@ -96,92 +96,83 @@ class BMCComponent(FirmwareComponent):
         
         timeout = 600
         start_time = time.time()
-        stage_completed = False
         
-        # === Phase 1: 等待 Staging 完成 (或 Immediate 的生效) ===
+        # 狀態標記
+        ready_to_reboot = False      # 用於 OnReset (Log 訊號)
+        auto_reboot_detected = False # 用於 Immediate (斷線訊號)
+
+        # === Phase 1: 等待更新觸發 (Wait Phase) ===
+        # Immediate: 等待斷線
+        # OnReset: 等待 Staging 完成訊號
         while time.time() - start_time < timeout:
             try:
+                # 保持連線活動，順便偵測斷線
                 self.ssh.send_command("echo check", timeout=5)
-                logs = self._fetch_new_logs()
                 
-                # 檢查是否有失敗訊息
-                if "ApplyFailed" in logs or "FlashFailed" in logs:
-                    error(f"Update Failed Logs: {logs}")
-                    raise UpdateFailedError("BMC Update Failed during staging.")
-
-                # 分策略檢查成功訊號
-                if apply_time == "Immediate":
-                    if "UpdateSuccessful" in logs:
-                        info("[bold green]Log: UpdateSuccessful found! (Immediate)[/bold green]")
-                        stage_completed = True
-                        break
-                
-                elif apply_time == "OnReset":
-                    # OnReset 不會立刻出現 UpdateSuccessful，而是出現 AwaitToActivate (或是 Task 完成)
+                # [OnReset] 必須主動撈 Log 才知道何時可以重開機
+                if apply_time == "OnReset":
+                    logs = self._fetch_new_logs()
                     if "AwaitToActivate" in logs or "UpdateStaged" in logs:
-                        info("[bold green]Log: Firmware Staged successfully (AwaitToActivate).[/bold green]")
-                        stage_completed = True
+                        info("[bold green]Log: Firmware Staged successfully (Ready to Reboot).[/bold green]")
+                        ready_to_reboot = True
                         break
-                    # 如果真的抓不到 Log，也可以考慮檢查 Redfish Task State (需實作)，這裡暫時依賴 Log
+                    
+                    # 快速失敗檢查
+                    if "ApplyFailed" in logs or "FlashFailed" in logs:
+                         raise UpdateFailedError("BMC Update Failed (Log indicates failure).")
 
             except (paramiko.ssh_exception.SSHException, OSError, ConnectionResetError):
-                # 斷線處理
+                # [Immediate] 斷線就是最好的訊號
                 if apply_time == "Immediate":
                     info("[bold green]Connection lost (Auto Reboot detected).[/bold green]")
-                    self._handle_reconnect(preserve)
-                    return # Immediate 斷線重連後就結束了 (Verify 在 engine 做)
+                    auto_reboot_detected = True
+                    break 
                 else:
                     warn(f"[Unexpected] Connection lost but ApplyTime is '{apply_time}'!")
                     self._handle_reconnect(preserve)
-                    return # 異常斷線，但也只能繼續
+                    return # 異常終止
 
-            except Exception:
-                time.sleep(5)
-            
             time.sleep(5)
 
-        if not stage_completed:
-            raise TimeoutError(f"Staging verification timed out (ApplyTime={apply_time}).")
-
-        # === Phase 2: 執行重開機 (針對 OnReset 或 Immediate 沒自動重開的情況) ===
+        # === Timeout 檢查 ===
+        if apply_time == "OnReset" and not ready_to_reboot:
+             raise TimeoutError("Timed out waiting for OnReset staging signal.")
         
-        info(f"Staging complete. Proceeding with reboot strategy for '{apply_time}'...")
+        # === Phase 2: 重開機與連線恢復 (Reboot Phase) ===
+        
+        # 1. 確保連線恢復 (處理 Immediate 剛才的斷線)
+        self._handle_reconnect(preserve)
 
-        if apply_time == "Immediate":
-            # Immediate 理應已經重開，如果還沒，等一下看看
-            info("Waiting 30s for auto-reboot...")
-            time.sleep(30)
-            try:
-                self.ssh.send_command("echo check", timeout=5)
-                warn("BMC did NOT auto-reboot. Forcing manual reboot...")
-                self.reboot_bmc()
-            except:
-                info("BMC auto-rebooted.")
-            
-            self._handle_reconnect(preserve)
-
-        elif apply_time == "OnReset":
-            # OnReset 必須手動重開
-            info("Initiating MANUAL REBOOT to apply firmware (OnReset)...")
+        # 2. 執行手動重開機 (僅 OnReset 需要)
+        if apply_time == "OnReset":
+            info("Initiating MANUAL REBOOT to apply firmware...")
             self.reboot_bmc()
+            self._handle_reconnect(preserve) # 等待重開機完成
+
+        # === Phase 3: 統一驗證 (Verification Phase) ===
+        # 這是您最想要的部分：所有 Log 檢查都移到這裡
+        
+        if preserve:
+            info("Verifying Update Status (Post-Reboot)...")
             
-            # 等待重開機與連線恢復
-            self._handle_reconnect(preserve)
+            # 給 BMC 一點時間寫入啟動 Log
+            time.sleep(20) 
             
-            # === Phase 3: 重開機後的確認 (僅限 OnReset) ===
-            # 因為 OnReset 的 Success Log 是在重開機後才寫入的
-            if preserve:
-                info("Checking for 'UpdateSuccessful' log after reboot...")
-                # 這裡要稍微等一下，讓 BMC 有時間寫 Log
-                time.sleep(20) 
-                logs = self._fetch_new_logs() # 抓取最新的 Log
-                
-                if "UpdateSuccessful" in logs:
-                     info("[bold green]Final Confirmation: UpdateSuccessful found in logs.[/bold green]")
-                else:
-                     warn("Could not find 'UpdateSuccessful' in logs after reboot. Please verify version manually.")
+            # 這裡會一次抓取從上傳後到現在的所有 Logs
+            logs = self._fetch_new_logs()
+            
+            # 1. 檢查更新成功訊號
+            if "UpdateSuccessful" in logs:
+                 info_block(logs, title="Success Log Found")
+                 
+                 # 2. 確認成功後，才檢查系統是否有其他錯誤 (SEL)
+                 self.check_system_logs()
             else:
-                info("Preserve is False. Skipping post-reboot log check.")
+                 warn("Could not find 'UpdateSuccessful' in logs after reboot.")
+                 # 即使沒看到成功 Log (可能被洗掉)，還是建議檢查一下 SEL 看有無 Critical
+                 self.check_system_logs()
+        else:
+            info("Preserve is False. Skipping post-reboot log check.")
 
     def _handle_reconnect(self, preserve):
         """處理斷線後的重連邏輯"""

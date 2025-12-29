@@ -1,5 +1,5 @@
 from src.components.base import FirmwareComponent
-from src.core.logger import info, error
+from src.core.logger import info, error, info_block
 from src.models.exceptions import UpdateFailedError, TimeoutError
 import time
 import json
@@ -47,7 +47,7 @@ class CPLDComponent(FirmwareComponent):
         )
         
         info("Upload Response:")
-        print(json.dumps(result, indent=4))
+        info_block(json.dumps(result, indent=4), title="Upload Response")
         if "Id" in result:
              info(f"Task Created: ID = {result['Id']}")
 
