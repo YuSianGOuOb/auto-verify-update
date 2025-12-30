@@ -1,0 +1,9 @@
+{
+    "UpdateParameters": {
+        "Oem": {
+            "QCT_IO": {
+                "Preserve": true
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "UpdateParameters": {
+        "@Redfish.OperationApplyTime": "Immediate",
+        "Oem": {
+            "QCT_IO": {
+                "Preserve": true
+            }
+        }
+    }
+}

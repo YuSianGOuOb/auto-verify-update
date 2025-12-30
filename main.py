@@ -15,16 +15,45 @@ from src.machines.standard import StandardMachineVerifier
 from src.core.logger import error, info, setup_logger, section
 from src.models.exceptions import VerificationSkipped
 
-def load_config(path):
+def load_config(config_path, strategy_path="config/strategies.yaml"):
     try:
-        with open(path, 'r') as f:
-            data = yaml.safe_load(f)
-        return Inventory(**data)
-    except FileNotFoundError:
-        error(f"Config file not found: {path}")
-        sys.exit(1)
+        # 1. 讀取 Inventory
+        with open(config_path, 'r') as f:
+            inv_data = yaml.safe_load(f)
+
+        # 2. 讀取 Strategies
+        strategies = {}
+        try:
+            with open(strategy_path, "r") as f:
+                strategies = yaml.safe_load(f).get("profiles", {})
+            info(f"Loaded strategies from {strategy_path}")
+        except FileNotFoundError:
+            info("No strategies.yaml found, using internal defaults.")
+
+        # 3. 合併策略
+        if "updates" in inv_data:
+            for item in inv_data["updates"]:
+                profile_name = item.get("profile")
+                
+                # [情況 A] 有指定 Profile 且 找到了
+                if profile_name and profile_name in strategies:
+                    item["strategy"] = strategies[profile_name]
+                    info(f"  [{item['name']}] Applied profile: '{profile_name}'")
+
+                # [情況 B] 有指定 Profile 但 找不到 -> 改為 Info/Warn 並使用預設
+                elif profile_name:
+                    from src.core.logger import warn
+                    warn(f"  [{item['name']}] Profile '{profile_name}' not found. Using DEFAULT strategy.")
+                    # 這裡不 assign item["strategy"]，Pydantic 會自動建立預設值
+
+                # [情況 C] 根本沒指定 Profile -> 使用預設
+                else:
+                    info(f"  [{item['name']}] No profile specified. Using DEFAULT strategy.")
+
+        return Inventory(**inv_data)
+        
     except Exception as e:
-        error(f"Invalid config format: {e}")
+        error(f"Failed to load configuration: {e}")
         sys.exit(1)
 
 def main():

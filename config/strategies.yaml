@@ -1,0 +1,28 @@
+profiles:
+  # === BMC 策略 ===
+  standard_bmc:
+    timeout: 600
+    primary_path: "/xyz/openbmc_project/software/BMCPrimary"
+    secondary_path: "/xyz/openbmc_project/software/BMCSecondary"
+    payload_file: "config/payloads/BMC_default.json"
+    update_endpoint: "/redfish/v1/UpdateService/upload"
+
+  # === BIOS 策略 ===
+  standard_bios:
+    timeout: 600  
+    verify_path: "/xyz/openbmc_project/software/BIOS"
+    payload_file: "config/payloads/BIOS_default.json"
+    update_endpoint: "/redfish/v1/UpdateService/upload"
+
+  # === CPLD 策略 (範例) ===
+  cpld_mb:
+    timeout: 600
+    verify_path: "/xyz/openbmc_project/software/MBCPLD"
+    payload_file: "config/payloads/CPLD_default.json"
+    update_endpoint: "/redfish/v1/UpdateService/upload"
+
+  cpld_scm:
+    timeout: 600
+    verify_path: "/xyz/openbmc_project/software/SCMCPLD"
+    payload_file: "config/payloads/CPLD_default.json"
+    update_endpoint: "/redfish/v1/UpdateService/upload"

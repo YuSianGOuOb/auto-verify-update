@@ -13,16 +13,26 @@ class PFRConfig(BaseModel):
     check_health: bool = True
     interface: str = "redfish" # redfish 或 ipmi
 
+#=== 更新策略設定 ===
+class UpdateStrategy(BaseModel):
+    timeout: int = 600
+    primary_path: Optional[str] = None
+    secondary_path: Optional[str] = None
+    verify_path: Optional[str] = None # 相容舊欄位
+    
+    # [修改] 改為儲存檔案路徑
+    payload_file: Optional[str] = None
+    update_endpoint: str = "/redfish/v1/UpdateService/upload"
+
 # === 單一元件更新設定 ===
 class UpdateConfig(BaseModel):
     name: str
     type: str          # BIOS, BMC, CPLD, PFR
-    subtype: Optional[str] = None  # 用於 CPLD (MB, FAN...)
     version: str
-    file: Optional[str] = None     # PFR 模式下可能不需要檔案
+    file: Optional[str] = None
     
-    apply_time: str = "Immediate"
-    preserve: bool = True
+    profile: Optional[str] = None
+    strategy: UpdateStrategy = Field(default_factory=UpdateStrategy)
     
     # PFR 模式專用：預期下游元件的版本
     expectations: Optional[Dict[str, str]] = {} 

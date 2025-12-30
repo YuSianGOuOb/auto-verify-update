@@ -51,8 +51,8 @@ fi
 
 # 執行 Container
 # 直接將參數透傳給 python main.py
+# 優化後的 docker run
 docker run --rm -it \
-  -v "$CONFIG_DIR":/app/config \
-  -v "$IMG_DIR":/app/img \
+  -v "$(pwd)":/app \
   $IMAGE_NAME \
   python main.py "${ARGS[@]}"
